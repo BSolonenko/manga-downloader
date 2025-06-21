@@ -25,9 +25,9 @@ class MangaDownloader(QThread):
         super().__init__()
         self.url = None
         self.cookies = None
-        self.cookie_file = Path("cookies.json")
+        self.cookie_file = Path("comx_life_cookies_v1.json")
         self.headers = {
-            "Referer": "https://com-x.life/",
+            "Referer": "https://comx.life/",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
         self._is_cancelled = False
@@ -37,7 +37,9 @@ class MangaDownloader(QThread):
         try:
             self.log.emit("🌐 Открытие браузера...")
             driver = self._open_browser_with_cookies()
-            self._auto_download_if_manga_page(driver)
+            if driver:
+                self.log.emit("🔎 Запуск отслеживания страницы манги...")
+                self._auto_download_if_manga_page(driver)
         except Exception as e:
             self.log.emit(f"❌ Ошибка: {e}")
             self.finished.emit(False)
@@ -56,55 +58,62 @@ class MangaDownloader(QThread):
         options = Options()
         options.add_experimental_option("detach", True)
         driver = webdriver.Chrome(options=options)
-        driver.get("https://com-x.life/")
+
+        driver.get("https://comx.life/")
 
         if self.cookie_file.exists():
-            self.log.emit("🍪 Загрузка cookies...")
+            self.log.emit("🍪 Пробую восстановить сессию...")
             with open(self.cookie_file, "r", encoding="utf-8") as f:
-                self.cookies = json.load(f)
-            for name, value in self.cookies.items():
-                driver.add_cookie({"name": name, "value": value, "domain": "com-x.life"})
-            driver.refresh()
-        else:
-            self.log.emit("🔐 Ожидание авторизации...")
-            try:
-                login_btn = driver.find_element(By.CSS_SELECTOR, 'div.header__btn-login')
-                driver.execute_script("arguments[0].click();", login_btn)
-            except:
-                self.log.emit("⚠️ Не удалось нажать кнопку входа")
+                cookies = json.load(f)
 
-            while True:
-                time.sleep(2)
-                cookies = driver.get_cookies()
-                found = any(c["name"] == "dle_user_id" for c in cookies)
-                if found:
-                    self.cookies = {c["name"]: c["value"] for c in cookies}
-                    try:
-                        with open(self.cookie_file, "w", encoding="utf-8") as f:
-                            json.dump(self.cookies, f, indent=2)
-                    except Exception as e:
-                        self.log.emit('⚠️ Ошибка при записи cookies.json: {e}')
-                    return driver
+            driver.delete_all_cookies()
+            for c in cookies:
+                c.pop("sameSite", None)
+                try:
+                    driver.add_cookie(c)
+                except Exception as e:
+                    self.log.emit(f"⚠️ Cookie {c.get('name')} не добавлен: {e}")
+
+            driver.refresh()
+            time.sleep(2)
+            if driver.get_cookie("dle_user_id"):
+                self.cookies = driver.get_cookies()
+                self.log.emit("✅ Авторизация восстановлена!")
+                return driver
+            self.log.emit("⚠️ Сессия устарела, нужна новая авторизация")
+
+        self.log.emit("🔐 Войдите вручную, я запомню cookies")
+        self.log.emit("📦 Ожидание страницы манги...")
+
+        while not driver.get_cookie("dle_user_id"):
+            if self._is_cancelled:
+                driver.quit()
+                self.finished.emit(False)
+                return None
+            time.sleep(1)
+
+        self.cookies = driver.get_cookies()
+        with open(self.cookie_file, "w", encoding="utf-8") as f:
+            json.dump(self.cookies, f, indent=2, ensure_ascii=False)
+
         return driver
 
     def _auto_download_if_manga_page(self, driver):
-        self.log.emit("📦 Ожидание страницы манги...")
         processed_url = None
 
         while not self._is_cancelled:
             try:
                 current_url = driver.current_url
-                clean_url = current_url.replace('/download', '')
-
-                if current_url.endswith('/download'):
-                    self.url = clean_url
+                if current_url and current_url.endswith('/download'):
+                    self.url = current_url.replace('/download', '')
                     self.log.emit(f"📍 Начинаем скачивание манги: {self.url}")
                     driver.quit()
                     self.download_manga()
                     self.finished.emit(True)
                     return
 
-                elif re.match(r"https://com-x\.life/\d+-", current_url) and current_url != processed_url:
+                elif current_url and "/" in current_url and ".html" in current_url and current_url != processed_url:
+                    self.log.emit(f"🔍 Проверка страницы: {current_url}")
                     try:
                         btn = driver.find_element(By.CSS_SELECTOR, 'a.page__btn-track.js-follow-status')
                         driver.execute_script('''
@@ -116,8 +125,8 @@ class MangaDownloader(QThread):
                         ''', btn)
                         self.log.emit("✅ Кнопка заменена на 'Скачать'")
                         processed_url = current_url
-                    except:
-                        pass
+                    except Exception as e:
+                        self.log.emit(f"⚠️ Кнопка не найдена: {e}")
 
                 time.sleep(0.1)
 
@@ -128,9 +137,20 @@ class MangaDownloader(QThread):
                 return
 
     def download_manga(self):
+        if not self.cookies:
+            self.log.emit("⚠️ Предупреждение: cookies не заданы — загружаю из файла")
+            try:
+                with open(self.cookie_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                    self.cookies = raw if isinstance(raw, list) else [
+                        {"name": k, "value": v} for k, v in raw.items()
+                    ]
+            except Exception as e:
+                self.log.emit(f"❌ Не удалось загрузить cookies из файла: {e}")
+                return
         self.download_started.emit()
         self.log.emit(f"📥 Скачивание HTML: {self.url}")
-        resp = requests.get(self.url, headers=self.headers, cookies=self.cookies)
+        resp = requests.get(self.url, headers=self.headers, cookies={c['name']: c['value'] for c in self.cookies})
         html = resp.text
 
         match = re.search(r'window\.__DATA__\s*=\s*({.*?})\s*;', html, re.DOTALL)
@@ -162,7 +182,7 @@ class MangaDownloader(QThread):
             zip_path = downloads_dir / filename
 
             self.log.emit(f"⬇️ {i}/{len(chapters)}: {title}")
-            r = requests.get(url, headers=self.headers, cookies=self.cookies)
+            r = requests.get(url, headers=self.headers, cookies={c['name']: c['value'] for c in self.cookies})
             if r.ok:
                 with open(zip_path, "wb") as f:
                     f.write(r.content)
@@ -214,7 +234,7 @@ class DownloaderApp(QWidget):
 
         self.button = QPushButton("Открыть сайт")
         self.cancel_button = QPushButton("Отмена")
-        self.cancel_button.hide()  # Скрываем кнопку отмены при запуске
+        self.cancel_button.hide()
         self.logs = QTextEdit(readOnly=True)
 
         layout.addWidget(self.button)
@@ -256,4 +276,3 @@ if __name__ == "__main__":
     win = DownloaderApp()
     win.show()
     sys.exit(app.exec_())
-
