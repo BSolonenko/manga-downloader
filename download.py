@@ -15,7 +15,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
-
 class MangaDownloader(QThread):
     log = pyqtSignal(str)
     finished = pyqtSignal(bool)
@@ -25,7 +24,7 @@ class MangaDownloader(QThread):
         super().__init__()
         self.url = None
         self.cookies = None
-        self.cookie_file = Path("comx_life_cookies_v1.json")
+        self.cookie_file = Path("comx_life_cookies_v2.json")
         self.headers = {
             "Referer": "https://comx.life/",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -148,6 +147,7 @@ class MangaDownloader(QThread):
             except Exception as e:
                 self.log.emit(f"❌ Не удалось загрузить cookies из файла: {e}")
                 return
+
         self.download_started.emit()
         self.log.emit(f"📥 Скачивание HTML: {self.url}")
         resp = requests.get(self.url, headers=self.headers, cookies={c['name']: c['value'] for c in self.cookies})
@@ -176,18 +176,60 @@ class MangaDownloader(QThread):
                 self.log.emit("❌ Скачивание отменено")
                 self.cleanup()
                 return
+
             title = chapter["title"]
-            url = chapter["download_link"]
+            chapter_id = chapter["id"]
+            news_id = data["news_id"]
             filename = re.sub(r"[^\w\- ]", "_", f"{i:06}_{title}") + ".zip"
             zip_path = downloads_dir / filename
 
             self.log.emit(f"⬇️ {i}/{len(chapters)}: {title}")
-            r = requests.get(url, headers=self.headers, cookies={c['name']: c['value'] for c in self.cookies})
-            if r.ok:
-                with open(zip_path, "wb") as f:
-                    f.write(r.content)
-            else:
-                self.log.emit(f"❌ Ошибка {r.status_code} при скачивании {title}")
+
+            try:
+                # Подготовка POST-запроса
+                payload = f"chapter_id={chapter_id}&news_id={news_id}"
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Referer": self.url,
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Origin": "https://comx.life",
+                    "User-Agent": self.headers["User-Agent"]
+                }
+
+                cookies = {c["name"]: c["value"] for c in self.cookies}
+                link_resp = requests.post(
+                    "https://comx.life/engine/ajax/controller.php?mod=api&action=chapters/download",
+                    headers=headers,
+                    data=payload,
+                    cookies=cookies
+                )
+
+                try:
+                    json_data = link_resp.json()
+                    raw_url = json_data.get("data")
+                    if not raw_url:
+                        raise ValueError("Поле 'data' не найдено в JSON")
+
+                    # Преобразуем \/\/ в // и добавляем протокол
+                    download_url = "https:" + raw_url.replace("\\/", "/")
+
+                    r = requests.get(download_url, headers=self.headers, cookies=cookies)
+                    if r.ok:
+                        with open(zip_path, "wb") as f:
+                            f.write(r.content)
+                    else:
+                        self.log.emit(f"❌ Ошибка {r.status_code} при скачивании {title}")
+                except Exception as e:
+                    self.log.emit(f"❌ Ошибка при обработке главы {title}: {e}")
+                    
+                if r.ok:
+                    with open(zip_path, "wb") as f:
+                        f.write(r.content)
+                else:
+                    self.log.emit(f"❌ Ошибка {r.status_code} при скачивании {title}")
+
+            except Exception as e:
+                self.log.emit(f"❌ Ошибка при обработке главы {title}: {e}")
 
         if self._is_cancelled:
             self.cleanup()
@@ -224,6 +266,7 @@ class MangaDownloader(QThread):
             return
 
         self.log.emit(f"✅ Готово: {final_cbz.resolve()}")
+
 
 class DownloaderApp(QWidget):
     def __init__(self):
