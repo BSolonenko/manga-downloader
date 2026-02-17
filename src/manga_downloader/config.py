@@ -2,10 +2,16 @@
 Константы и конфигурация приложения.
 """
 
+import sys
 from pathlib import Path
 
 # --- Пути ---
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Рабочая директория = папка, откуда запущен EXE / скрипт.
+# Все данные (куки, история, загрузки) хранятся рядом с исполняемым файлом.
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent.parent.parent
 COOKIE_FILE = BASE_DIR / "comx_life_cookies_v3.json"
 HISTORY_FILE = BASE_DIR / "manga_history.json"
 DOWNLOADS_DIR = BASE_DIR / "downloads"
