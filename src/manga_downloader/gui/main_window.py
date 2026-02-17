@@ -34,6 +34,7 @@ from PyQt5.QtWidgets import (
 
 from manga_downloader.config import OUTPUT_DIR
 from manga_downloader.gui.chapter_dialog import ChapterSelectDialog
+from manga_downloader.gui.donation_dialog import DonationDialog
 from manga_downloader.gui.styles import (
     APP_STYLE,
     LOG_COLOR_DEFAULT,
@@ -94,10 +95,16 @@ class DownloaderApp(QWidget):
         self._btn_open_folder.setObjectName("btn_open_folder")
         self._btn_open_folder.setVisible(self._has_output_files())
 
+        self._btn_donate = QPushButton("☕ Кофе автору")
+        self._btn_donate.setObjectName("btn_donate")
+        self._btn_donate.setCursor(Qt.PointingHandCursor)
+        self._btn_donate.setToolTip("Поддержать автора")
+
         button_layout.addWidget(self._btn_start)
         button_layout.addWidget(self._btn_cancel)
         button_layout.addWidget(self._btn_open_folder)
         button_layout.addStretch()
+        button_layout.addWidget(self._btn_donate)
 
         # === Библиотека ===
         library_label = QLabel("Библиотека")
@@ -160,6 +167,7 @@ class DownloaderApp(QWidget):
         self._btn_open_folder.clicked.connect(self._on_open_folder)
         self._btn_clear_log.clicked.connect(self._on_clear_log)
         self._btn_save_log.clicked.connect(self._on_save_log)
+        self._btn_donate.clicked.connect(self._on_donate)
 
     # -- Закрытие окна ---------------------------------------------------------
 
@@ -463,6 +471,12 @@ class DownloaderApp(QWidget):
 
     def _on_clear_log(self) -> None:
         self._logs.clear()
+
+    def _on_donate(self) -> None:
+        """Показывает диалог с информацией о добровольных пожертвованиях."""
+        dialog = DonationDialog(self)
+        dialog.setStyleSheet(APP_STYLE)
+        dialog.exec()
 
     def _on_save_log(self) -> None:
         """Сохраняет лог в текстовый файл."""

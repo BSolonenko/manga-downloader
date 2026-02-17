@@ -29,6 +29,10 @@ _BLUE_PRESSED = "#2a76b8"
 
 _ACCENT = "#6a9eda"
 
+_ORANGE = "#ff813f"
+_ORANGE_HOVER = "#ff9a5c"
+_ORANGE_PRESSED = "#e06a2a"
+
 # -- Общие стили приложения ---------------------------------------------------
 APP_STYLE = f"""
 QWidget {{
@@ -420,6 +424,67 @@ QScrollBar::sub-line:horizontal {{
 QScrollBar::add-page:horizontal,
 QScrollBar::sub-page:horizontal {{
     background: none;
+}}
+
+/* --- Кнопка доната --- */
+QPushButton#btn_donate {{
+    background-color: {_ORANGE};
+    border-color: {_ORANGE};
+    padding: 8px 14px;
+    font-size: 10pt;
+}}
+QPushButton#btn_donate:hover {{
+    background-color: {_ORANGE_HOVER};
+    border-color: {_ORANGE_HOVER};
+}}
+QPushButton#btn_donate:pressed {{
+    background-color: {_ORANGE_PRESSED};
+}}
+
+/* --- Диалог доната --- */
+QLabel#donate_icon {{
+    font-size: 36pt;
+    background-color: transparent;
+    padding: 0;
+}}
+QLabel#donate_title {{
+    color: {_ORANGE};
+    font-size: 14pt;
+    font-weight: bold;
+    background-color: transparent;
+}}
+QLabel#donate_text {{
+    color: {_TEXT};
+    font-size: 10pt;
+    background-color: transparent;
+    line-height: 150%;
+}}
+QPushButton#btn_donate_confirm {{
+    background-color: {_ORANGE};
+    border-color: {_ORANGE};
+    padding: 10px 28px;
+    font-size: 11pt;
+}}
+QPushButton#btn_donate_confirm:hover {{
+    background-color: {_ORANGE_HOVER};
+    border-color: {_ORANGE_HOVER};
+}}
+QPushButton#btn_donate_confirm:pressed {{
+    background-color: {_ORANGE_PRESSED};
+}}
+QPushButton#btn_donate_cancel {{
+    background-color: transparent;
+    border: 1px solid {_BORDER};
+    border-radius: 6px;
+    padding: 10px 22px;
+    font-size: 10pt;
+    font-weight: normal;
+    color: {_TEXT_DIM};
+}}
+QPushButton#btn_donate_cancel:hover {{
+    background-color: {_BG_LIGHT};
+    border-color: {_ACCENT};
+    color: {_TEXT};
 }}
 """
 
