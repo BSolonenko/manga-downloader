@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Application data
+downloads/
+combined_cbz_temp/
+output/
+comx_life_cookies_*
+
+# PyInstaller / build
+win/
+build/
+*.spec
+
+# OS
+Thumbs.db
+.DS_Store
