@@ -21,6 +21,7 @@ downloads/
 combined_cbz_temp/
 output/
 comx_life_cookies_*
+manga_history.json
 
 # PyInstaller / build
 win/

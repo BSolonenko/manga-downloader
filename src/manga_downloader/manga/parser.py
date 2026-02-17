@@ -41,31 +41,62 @@ class MangaParser:
 
     def __init__(self, cookie_manager: CookieManager) -> None:
         self._cookie_manager = cookie_manager
+        self._session: curl_cffi.Session | None = None
+
+    def _get_session(self, *, use_cookies: bool = True) -> curl_cffi.Session:
+        """Возвращает переиспользуемую сессию (keep-alive, один TLS handshake)."""
+        if self._session is None:
+            self._session = curl_cffi.Session()
+            self._session.headers.update(BROWSE_HEADERS)
+            if use_cookies:
+                self._cookie_manager.apply_to_session(self._session)
+        return self._session
+
+    def close(self) -> None:
+        """Закрывает сессию."""
+        if self._session is not None:
+            self._session.close()
+            self._session = None
 
     def fetch(self, url: str) -> MangaInfo | None:
         """Загружает страницу и парсит данные манги.
 
+        Пробует сначала с cookies, затем без них (curl_cffi может
+        самостоятельно пройти Cloudflare challenge).
         Возвращает ``None`` при ошибке.
         """
+        for use_cookies in (True, False):
+            try:
+                html = self._fetch_html(url, use_cookies=use_cookies)
+                result = self._parse_html(html, url)
+                if result:
+                    return result
+            except Exception as exc:
+                label = "с cookies" if use_cookies else "без cookies"
+                logger.debug("Попытка %s не удалась для %s: %s", label, url, exc)
+        return None
+
+    def fetch_quick(self, url: str, timeout: int = 10) -> MangaInfo | None:
+        """Быстрая проверка: одна попытка с cookies и коротким таймаутом."""
         try:
-            html = self._fetch_html(url)
+            html = self._fetch_html(url, use_cookies=True, timeout=timeout)
             return self._parse_html(html, url)
         except Exception as exc:
-            logger.error("Ошибка при получении данных манги: %s", exc)
+            logger.debug("Быстрая проверка не удалась для %s: %s", url, exc)
             return None
 
-    def _fetch_html(self, url: str) -> str:
-        with curl_cffi.Session() as session:
-            session.headers.update(BROWSE_HEADERS)
-            self._cookie_manager.apply_to_session(session)
-            response = session.get(url, impersonate="chrome", timeout=HTTP_TIMEOUT)
-            return response.text
+    def _fetch_html(self, url: str, *, use_cookies: bool = True, timeout: int = HTTP_TIMEOUT) -> str:
+        session = self._get_session(use_cookies=use_cookies)
+        response = session.get(url, impersonate="chrome", timeout=timeout)
+        if response.status_code != 200:
+            raise RuntimeError(f"HTTP {response.status_code}")
+        return response.text
 
     @staticmethod
     def _parse_html(html: str, url: str) -> MangaInfo | None:
         match = _DATA_RE.search(html)
         if not match:
-            logger.error("Не найден window.__DATA__ на странице %s", url)
+            logger.debug("Не найден window.__DATA__ на странице %s", url)
             return None
 
         data = json.loads(match.group(1))
