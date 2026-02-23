@@ -330,7 +330,7 @@ class ChapterWorker(QThread):
         try:
             btn = wait.until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "a.page__btn-track.js-follow-status")
+                    (By.CSS_SELECTOR, "a.page__btn-sec.js-follow-status")
                 )
             )
             self._driver.execute_script(_INJECT_DOWNLOAD_BTN_JS, btn)
