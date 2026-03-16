@@ -17,7 +17,7 @@ python -m PyInstaller ^
     --hidden-import "manga_downloader.downloaders.selenium_downloader" ^
     --hidden-import "curl_cffi" ^
     --hidden-import "cloudscraper" ^
-    --collect-data "selenium" ^
+    --collect-all "selenium" ^
     src\manga_downloader\__main__.py
 
 if %ERRORLEVEL% EQU 0 (

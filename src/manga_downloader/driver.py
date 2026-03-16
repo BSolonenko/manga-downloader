@@ -59,11 +59,13 @@ def create_chrome_driver(*, detach: bool = False) -> webdriver.Chrome:
 
 def _raise_with_hint(summary: str, cause: Exception) -> None:
     logger.error("%s — %s", summary, cause)
+    short_cause = str(cause).split("\n")[0][:200]
     hint = (
         f"{summary}\n"
         "Возможные причины:\n"
         "  • Google Chrome не установлен или устарел — обновите до последней версии.\n"
         "  • Нет доступа в интернет — ChromeDriver скачивается автоматически.\n"
-        "  • Антивирус блокирует chromedriver.exe — добавьте исключение."
+        "  • Антивирус блокирует chromedriver.exe — добавьте исключение.\n"
+        f"Техническая информация: {short_cause}"
     )
     raise ChromeDriverError(hint) from cause
