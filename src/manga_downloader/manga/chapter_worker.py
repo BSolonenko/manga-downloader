@@ -21,7 +21,6 @@ from threading import Event
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -37,8 +36,8 @@ from manga_downloader.config import (
     REQUEST_DELAY,
     SELENIUM_WAIT_TIMEOUT,
     TEMP_DIR,
-    USER_AGENT,
 )
+from manga_downloader.driver import ChromeDriverError, create_chrome_driver
 from manga_downloader.cookies import CookieManager
 from manga_downloader.downloaders import FallbackDownloader
 from manga_downloader.manga.parser import MangaInfo, MangaParser
@@ -186,7 +185,12 @@ class ChapterWorker(QThread):
     def _run_browser_flow(self) -> None:
         """Стандартный режим: открытие браузера и мониторинг."""
         self.log.emit("🌐 Открытие браузера...")
-        self._driver = self._open_browser()
+        try:
+            self._driver = self._open_browser()
+        except ChromeDriverError as exc:
+            self.log.emit(f"❌ {exc}")
+            self.finished_ok.emit(False)
+            return
         if self._driver:
             if self._initial_url:
                 download_url = self._initial_url.rstrip("/") + "/download"
@@ -199,12 +203,7 @@ class ChapterWorker(QThread):
     # -- Браузер и авторизация -------------------------------------------------
 
     def _open_browser(self) -> webdriver.Chrome | None:
-        options = Options()
-        options.add_experimental_option("detach", True)
-        options.add_experimental_option("excludeSwitches", ["enable-logging"])
-        options.add_argument(f"--user-agent={USER_AGENT}")
-        options.add_argument("--log-level=3")
-        driver = webdriver.Chrome(options=options)
+        driver = create_chrome_driver(detach=True)
         driver.get(BASE_URL)
 
         if self._cookie_manager.path.exists():
