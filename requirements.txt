@@ -1,5 +1,6 @@
 PyQt5>=5.15
 selenium>=4.0
+webdriver-manager>=4.0
 curl_cffi>=0.5
 cloudscraper>=1.2
 requests>=2.28

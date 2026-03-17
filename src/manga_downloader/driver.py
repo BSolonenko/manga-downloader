@@ -2,7 +2,8 @@
 Централизованное управление Chrome WebDriver.
 
 Единая точка создания драйвера для всех модулей приложения.
-Обрабатывает типичные ошибки и выдаёт понятные сообщения пользователю.
+Использует webdriver-manager для скачивания ChromeDriver —
+работает надёжно и из обычного скрипта, и из PyInstaller-бандла.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 from manga_downloader.config import USER_AGENT
 
@@ -42,16 +45,11 @@ def create_chrome_driver(*, detach: bool = False) -> webdriver.Chrome:
     options.add_experimental_option("excludeSwitches", ["enable-logging"])
 
     try:
-        return webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
     except SessionNotCreatedException as exc:
         _raise_with_hint("Версия ChromeDriver несовместима с установленным Chrome.", exc)
     except WebDriverException as exc:
-        msg = str(exc)
-        if "unable to obtain" in msg.lower() or "cannot find" in msg.lower():
-            _raise_with_hint(
-                "Не удалось получить ChromeDriver автоматически.",
-                exc,
-            )
         _raise_with_hint("Ошибка запуска Chrome.", exc)
     except Exception as exc:
         _raise_with_hint("Непредвиденная ошибка при запуске Chrome.", exc)
